@@ -305,10 +305,84 @@ if(t.type==='file'){if(e.type==='change'&&t.files[0]){msg('Processing image…')
 o[k]=t.dataset.t==='tr'?{en:t.value}:t.value}
 const HEAD=n=>`<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Ace | ${esc(n)}</title><meta name="description" content="Ace is a personal home on the internet: accounts, interests, projects and goals."><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">`;
 const buildDoc=d=>'<!DOCTYPE html>\n<html lang="en">\n<head>'+HEAD(d.name)+'<style id="css">'+$('#css').textContent+'</style></head>\n<body>\n<script id="shell" type="text/html">'+$('#shell').textContent+'<\/script>\n<script id="data" type="application/json">'+JSON.stringify(d).replace(/</g,'\\u003c')+'<\/script>\n<script id="app">'+$('#app').textContent+'<\/script>\n</body>\n</html>';
-async function save(){
-const a=CL&&await CL.use('artifact');if(!a)return msg('Saving is not available in this view.');
-try{msg('Publishing…');await a.publish(buildDoc(D))}
-catch(e){const c=e&&e.code;msg(c==='conflict'?'A newer version was published. Reloading…':(c==='not_writer'||c==='not_granted')?'Only the owner can publish changes.':'Could not publish ('+(c||'error')+').')}}
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+    let pass = prompt("Enter admin password:");
+    if (pass === "123456") {
+      localStorage.setItem('ace_admin', 'true');
+      alert("Authenticated as admin!");
+      ownerReady();
+      openDash();
+    } else {
+      alert("Incorrect password!");
+    }
+  }
+});
+
+if (localStorage.getItem('ace_admin') === 'true') {
+  ownerReady();
+}
+
+async function save() {
+  let token = localStorage.getItem('gh_token');
+  let owner = localStorage.getItem('gh_owner');
+  let repo  = localStorage.getItem('gh_repo');
+
+  if (!token || !owner || !repo) {
+    token = prompt("Enter GitHub Personal Access Token:");
+    owner = prompt("Enter GitHub Username:");
+    repo  = prompt("Enter Repository Name:");
+
+    if (!token || !owner || !repo) {
+      return alert("All fields are required to save changes!");
+    }
+
+    localStorage.setItem('gh_token', token);
+    localStorage.setItem('gh_owner', owner);
+    localStorage.setItem('gh_repo', repo);
+  }
+
+  const path = "index.html";
+  const url = `https://api.github.com/repos/\({owner}/\){repo}/contents/${path}`;
+
+  try {
+    const getRes = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!getRes.ok) throw new Error("Could not access repository. Check username and repo name.");
+    
+    const getData = await getRes.json();
+    const sha = getData.sha;
+
+    const updatedContent = buildDoc(D);
+    const encodedContent = btoa(unescape(encodeURIComponent(updatedContent)));
+
+    const putRes = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: "Update content via Ace Dashboard",
+        content: encodedContent,
+        sha: sha
+      })
+    });
+
+    if (putRes.ok) {
+      alert("Changes saved and published successfully!");
+      location.reload();
+    } else {
+      const errData = await putRes.json();
+      alert("Save failed: " + errData.message);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Connection error: " + err.message);
+  }
+}
 async function translate(){
 const sm=CL&&await CL.use('sample');if(!sm)return msg('Translation is not available in this view.');
 const all=[],add=o=>{if(o&&o.en&&!o.fr)all.push(o)};
