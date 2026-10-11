@@ -231,6 +231,25 @@ $('#lb').onclick=e=>{e.stopPropagation();$('#lb').setAttribute('aria-expanded',$
 document.addEventListener('click',()=>$('#lm').classList.remove('open'));
 applyLang(false);
 
+// Set this to your deployed Cloudflare Worker URL after deploying the API.
+const ACE_API_URL = 'https://YOUR-ACE-API.workers.dev';
+if (!ACE_API_URL.includes('YOUR-ACE-API')) {
+  fetch(ACE_API_URL.replace(/\/$/, '') + '/api/site', { headers: { 'Accept': 'application/json' } })
+    .then(r => { if (!r.ok) throw new Error('Ace API unavailable'); return r.json(); })
+    .then(remote => {
+      if (!remote || typeof remote.name !== 'string' || !Array.isArray(remote.accounts)) return;
+      S = remote;
+      S.intro = tr(S.intro); S.about = tr(S.about);
+      S.likes = (S.likes || []).map(x => x && x.t ? x : { t: tr(x) });
+      S.goals = (S.goals || []).map(x => x && x.t ? x : { t: tr(x) });
+      (S.projects || []).forEach(p => ['n','d','s','l'].forEach(k => p[k] = tr(p[k])));
+      S.show = Object.assign({accounts:1,about:1,goals:1,projects:1}, S.show || {});
+      if (!TR[lang] || lang === 'auto') lang = (navigator.languages || [navigator.language || 'en']).map(x => String(x).slice(0,2).toLowerCase()).find(x => TR[x]) || 'en';
+      applyLang(true);
+    })
+    .catch(err => console.warn('Ace API fallback: using embedded site data.', err));
+}
+
 const nav=$('#nav'),bg=$('#burger');
 addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>40),{passive:true});
 bg.onclick=()=>bg.setAttribute('aria-expanded',nav.classList.toggle('open'));
